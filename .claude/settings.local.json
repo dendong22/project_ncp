@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://api.github.com/search/code?q=ClovaEmbeddings+in:file+filename:clova.py+repo:langchain-ai/langchain\")",
+      "Bash(curl -sL \"https://github.com/search?q=repo%3Alangchain-ai%2Flangchain+ClovaEmbeddings&type=code\" -A \"Mozilla/5.0\")"
+    ]
+  }
+}
