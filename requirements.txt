@@ -1,4 +1,5 @@
 streamlit>=1.38.0
+nicegui>=1.4.0
 google-genai>=1.0.0
 faiss-cpu>=1.7.4
 pymupdf>=1.24.0
@@ -6,3 +7,4 @@ pydantic>=2.0.0
 numpy>=1.24.0
 requests>=2.31.0
 python-dotenv>=1.0.0
+python-docx>=1.1.0

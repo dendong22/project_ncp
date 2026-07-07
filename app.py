@@ -11,6 +11,7 @@ from modules.schemas import ScreeningReport, Finding, Severity
 from modules.gemini_client import GeminiClient
 from modules.embedder_clova import ClovaEmbedder
 from modules.vectorstore import VectorStore
+from modules.llm_provider import get_pass2_client
 from pipeline import run_screening
 
 load_dotenv()
@@ -214,8 +215,10 @@ def load_resources():
             logger.warning(f"인덱스 로드 실패: {e}")
     else:
         logger.warning("인덱스 파일이 존재하지 않습니다. 'python -m modules.ingest' 실행이 필요합니다.")
-    
-    return gemini, embedder, vectorstore
+
+    pass2_client = get_pass2_client(gemini)
+
+    return gemini, pass2_client, embedder, vectorstore
 
 
 def get_severity_class(severity: Severity) -> str:
@@ -390,7 +393,7 @@ def main():
     
     # 리소스 로드
     try:
-        gemini, embedder, vectorstore = load_resources()
+        gemini, pass2_client, embedder, vectorstore = load_resources()
     except Exception as e:
         st.error(f"⚠️ 리소스 로드 실패: {e}")
         st.info("`.env` 파일의 API 키 설정과 인덱스 구축 여부를 확인하세요.")
@@ -432,10 +435,11 @@ def main():
                     st.write(f"**[{stage}]** {detail}")
                 
                 try:
-                    report = run_screening(
+                    report, _pass1_output = run_screening(
                         file_bytes=file_bytes,
                         mime_type=mime_type,
-                        gemini=gemini,
+                        pass1_client=gemini,
+                        pass2_client=pass2_client,
                         embedder=embedder,
                         vectorstore=vectorstore,
                         progress_callback=progress_callback,

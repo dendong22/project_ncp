@@ -32,11 +32,22 @@ class RiskPoint(BaseModel):
     query_text: str                   # 벡터 검색용 재구성 쿼리 (법률 용어로 정규화)
 
 
+class InventoryItem(BaseModel):
+    """기획서에서 추출된 개인정보 처리 항목 (수집~파기 수명주기 매핑용)."""
+    item: str                          # "이메일 주소"
+    category: str                      # "일반" / "고유식별정보" / "민감정보"
+    purpose: str                       # 수집·이용 목적
+    retention: str                     # 보유기간. 기재 없으면 "명시 없음"
+    third_party: str = ""              # 제공·위탁 대상. 없으면 빈 문자열
+    lifecycle_stages: list[str] = Field(default_factory=list)  # ["수집","이용","제공","파기"] 중 언급된 단계
+
+
 class Pass1Output(BaseModel):
     """Pass 1 (OCR + 리스크 포인트 추출) 출력 스키마."""
     full_text: str                    # 페이지 구분자를 포함한 OCR 전문
     ocr_confidence_notes: list[str]   # 판독 불가/저신뢰 영역 목록
     risk_points: list[RiskPoint] = Field(default_factory=list, max_length=10)
+    inventory: list[InventoryItem] = Field(default_factory=list, max_length=20)
 
 
 # ──────────────────────────────────────────────
@@ -58,6 +69,25 @@ class Remediation(BaseModel):
     rationale: str                    # 수정안이 위반을 해소하는 논리
 
 
+class CrossExamVerdict(str, Enum):
+    """반론 에이전트의 교차검증 결론."""
+    UPHOLD = "유지"       # 반론이 판정을 뒤집지 못함
+    WEAKEN = "약화"       # 반론에 일리가 있어 확신도만 하향
+    OVERTURN = "철회"     # 반론이 타당하여 판정 폐기
+
+
+class CrossExamResult(BaseModel):
+    """단일 finding에 대한 반론 에이전트의 교차검증 결과."""
+    point_id: str
+    verdict: CrossExamVerdict
+    rebuttal: str                     # 반론 요지 (UI 로그/배지에 노출)
+
+
+class CrossExamBatch(BaseModel):
+    """교차검증 1회 호출의 배치 출력 (findings와 1:1 대응)."""
+    results: list[CrossExamResult] = Field(default_factory=list)
+
+
 class Finding(BaseModel):
     """개별 위반 발견 사항."""
     point_id: str
@@ -68,6 +98,7 @@ class Finding(BaseModel):
     original_text: str                # 기획서 원문 (수정 대상)
     remediation: Remediation
     confidence: float = Field(ge=0.0, le=1.0)
+    cross_exam: Optional[CrossExamResult] = None
 
 
 class ScreeningReport(BaseModel):

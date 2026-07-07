@@ -103,6 +103,12 @@ class VectorStore:
         
         return results
     
+    def get_all_vectors(self) -> np.ndarray:
+        """인덱스에 저장된 원본 벡터 전체를 복원한다 (증분 인제스트용)."""
+        if self.index is None or self.index.ntotal == 0:
+            return np.zeros((0, self.dim), dtype=np.float32)
+        return self.index.reconstruct_n(0, self.index.ntotal)
+
     def expand_to_parent(self, chunk: RetrievedChunk) -> RetrievedChunk:
         """항(子) 청크 히트 시 조문(親) 전체 텍스트로 컨텍스트 확장.
         

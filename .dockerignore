@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+.vscode/
+.claude/
+tests/
+scripts/
+app.py
+.env
+# 코퍼스 원본 자료(루트의 법령 원문 .doc/.docx/.pdf/.txt) — data/corpus/*.json으로 이미 가공됨
+/*.doc
+/*.docx
+/*.pdf
+/*.txt
+!requirements.txt
+data/history.db
+BLUEPRINT.md

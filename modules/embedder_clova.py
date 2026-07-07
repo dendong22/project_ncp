@@ -113,7 +113,15 @@ class ClovaEmbedder:
         return self._l2_normalize(result)
     
     def embed_query(self, text: str) -> np.ndarray:
-        """단일 쿼리 임베딩."""
+        """단일 쿼리 임베딩.
+
+        검색 품질에 직결되므로 폴백(랜덤 벡터)을 허용하지 않는다.
+        실패 시 명시적으로 예외를 발생시켜 호출측(pipeline)이
+        해당 리스크 포인트를 판정 보류로 처리하게 한다.
+        """
+        before = self.fallback_count
         vec = self._call_api(text)
+        if self.fallback_count > before:
+            raise RuntimeError(f"쿼리 임베딩 실패로 로컬 대체 벡터가 생성되었습니다: {text[:50]!r}")
         vec = vec.astype(np.float32).reshape(1, -1)
         return self._l2_normalize(vec).flatten()

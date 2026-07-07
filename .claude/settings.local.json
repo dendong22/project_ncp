@@ -2,7 +2,29 @@
   "permissions": {
     "allow": [
       "Bash(curl -s \"https://api.github.com/search/code?q=ClovaEmbeddings+in:file+filename:clova.py+repo:langchain-ai/langchain\")",
-      "Bash(curl -sL \"https://github.com/search?q=repo%3Alangchain-ai%2Flangchain+ClovaEmbeddings&type=code\" -A \"Mozilla/5.0\")"
+      "Bash(curl -sL \"https://github.com/search?q=repo%3Alangchain-ai%2Flangchain+ClovaEmbeddings&type=code\" -A \"Mozilla/5.0\")",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(.venv/Scripts/python.exe -m pip list)",
+      "WebSearch",
+      "WebFetch(domain:api.ncloud-docs.com)",
+      "Bash(.venv/Scripts/python.exe -m pip install nicegui python-docx)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -c ' *)",
+      "Bash(mkdir -p \"C:/Users/zzabs/AppData/Local/Temp/claude/C--Users-zzabs-Desktop-legal-screening-agent/19ecc413-61bd-4cab-af18-992945c3cb53/scratchpad\")",
+      "Bash(SCRATCH=C:/Users/zzabs/AppData/Local/Temp/claude/C--Users-zzabs-Desktop-legal-screening-agent/19ecc413-61bd-4cab-af18-992945c3cb53/scratchpad .venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe -m modules.ingest --corpus data/corpus --out data/index --append)",
+      "Bash(grep -rn \"class FileUpload\" \"C:/Users/zzabs/Desktop/legal-screening-agent/.venv/Lib/site-packages/nicegui/\")",
+      "Bash(.venv/Scripts/python.exe -m modules.ingest --corpus data/corpus --out data/index)",
+      "Bash(tee /c/Users/zzabs/AppData/Local/Temp/claude/C--Users-zzabs-Desktop-legal-screening-agent/19ecc413-61bd-4cab-af18-992945c3cb53/scratchpad/ingest_rebuild.log)",
+      "Bash(.venv/Scripts/python.exe scripts/build_demo_docs.py)",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app_v2.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\); print\\('app.py syntax OK'\\)\")",
+      "Bash(docker --version)",
+      "Bash(docker info *)",
+      "Bash(docker build *)",
+      "PowerShell(Get-Process \"Docker Desktop\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Service com.docker.service -ErrorAction SilentlyContinue)"
     ]
   }
 }

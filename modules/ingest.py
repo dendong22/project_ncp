@@ -60,12 +60,16 @@ def parse_statute(raw_text: str, law_id: str, law_name: str, source_type: str = 
     - 호: 1. 2. 3. ...
     """
     articles = []
-    
-    # 조문 분리 패턴
+
+    # 조문 분리 패턴. 줄 시작 위치에서만 매칭해야 한다 — 그렇지 않으면
+    # "「에너지법」 제2조제1호에 따른..." 같은 타법 인용이나 부칙의
+    # "제17조의2, 제18조, 제22조의3 및 제35조..." 같은 문장 중간의
+    # 조문 번호 언급까지 조문 경계로 오인해 파싱이 깨진다.
     article_pattern = re.compile(
-        r'제(\d+(?:의\d+)?)조\s*(?:\(([^)]+)\))?'
+        r'^제(\d+(?:의\d+)?)조\s*(?:\(([^)]+)\))?',
+        re.MULTILINE,
     )
-    
+
     # 텍스트를 조문 단위로 분할
     splits = article_pattern.split(raw_text)
     
@@ -267,48 +271,72 @@ def main():
     parser.add_argument("--corpus", type=str, required=True, help="코퍼스 디렉터리 경로")
     parser.add_argument("--out", type=str, required=True, help="인덱스 출력 디렉터리")
     parser.add_argument("--dim", type=int, default=1024, help="임베딩 차원")
+    parser.add_argument(
+        "--append", action="store_true",
+        help="기존 인덱스에 law_id가 없는 코퍼스 파일만 추가 임베딩하여 병합 "
+             "(기존 벡터는 재임베딩하지 않고 인덱스에서 복원)",
+    )
     args = parser.parse_args()
-    
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     load_dotenv()
-    
+
     corpus_dir = Path(args.corpus)
     out_dir = Path(args.out)
-    
+
     if not corpus_dir.exists():
         logger.error(f"코퍼스 디렉터리를 찾을 수 없습니다: {corpus_dir}")
         sys.exit(1)
-    
+
+    # --append: 기존 인덱스에 이미 있는 law_id는 건너뛴다
+    existing_law_ids: set[str] = set()
+    existing_vectors = None
+    existing_metadatas: list[ChunkMeta] = []
+    if args.append and (out_dir / VectorStore.INDEX_FILENAME).exists():
+        old_store = VectorStore(dim=args.dim)
+        old_store.load(out_dir)
+        existing_metadatas = old_store.metadatas
+        existing_vectors = old_store.get_all_vectors()
+        existing_law_ids = {m.law_id for m in existing_metadatas}
+        logger.info(f"기존 인덱스 로드: {len(existing_metadatas)}개 청크, law_id={existing_law_ids}")
+
     # 1. 코퍼스 로드 및 청킹
     all_chunks: list[ChunkMeta] = []
-    
+
     for file_path in sorted(corpus_dir.glob("*")):
         if file_path.suffix not in (".json", ".txt"):
             continue
-        
-        logger.info(f"처리 중: {file_path.name}")
+
         corpus_data = load_corpus_file(file_path)
-        
-        source_type = corpus_data.get("source_type", "statute")
         law_id = corpus_data["law_id"]
+
+        if args.append and law_id in existing_law_ids:
+            logger.info(f"건너뜀 (이미 인덱싱됨): {file_path.name} ({law_id})")
+            continue
+
+        logger.info(f"처리 중: {file_path.name}")
+        source_type = corpus_data.get("source_type", "statute")
         law_name = corpus_data["law_name"]
         text = corpus_data["text"]
-        
+
         if source_type == "guideline":
             chunks = chunk_guideline(text, law_id, law_name)
         else:
             articles = parse_statute(text, law_id, law_name, source_type)
             chunks = chunk_corpus(articles, law_id, law_name, source_type)
-        
+
         all_chunks.extend(chunks)
-    
+
     if not all_chunks:
+        if existing_metadatas:
+            logger.info("새로 추가할 코퍼스가 없습니다. 기존 인덱스를 그대로 유지합니다.")
+            sys.exit(0)
         logger.error("청킹된 데이터가 없습니다.")
         sys.exit(1)
-    
-    logger.info(f"총 {len(all_chunks)}개 청크 생성")
-    
-    # 2. 임베딩
+
+    logger.info(f"총 {len(all_chunks)}개 신규 청크 생성")
+
+    # 2. 임베딩 (신규 청크만)
     clova_api_key = os.getenv("CLOVA_API_KEY", "").strip()
     clova_apigw_key = os.getenv("CLOVA_APIGW_KEY", "").strip()
     clova_app_id = (
@@ -316,12 +344,9 @@ def main():
         or os.getenv("CLOVA_APP_ID", "").strip()
     )
 
-    if not clova_api_key or not clova_apigw_key:
+    if not clova_api_key:
         logger.error("Clova API 키가 설정되지 않았습니다. .env 파일을 확인하세요.")
         sys.exit(1)
-
-    if not clova_app_id:
-        logger.warning("CLOVA_EMBEDDING_APP_ID가 없어도 진행합니다. 최신 Clova API는 app_id 없이도 동작할 수 있습니다.")
 
     embedder = ClovaEmbedder(
         api_key=clova_api_key,
@@ -329,10 +354,10 @@ def main():
         app_id=clova_app_id,
         dim=args.dim,
     )
-    
+
     texts = [chunk.text for chunk in all_chunks]
     logger.info(f"{len(texts)}개 텍스트 임베딩 시작...")
-    vectors = embedder.embed_documents(texts)
+    new_vectors = embedder.embed_documents(texts)
 
     if embedder.fallback_count:
         logger.error(
@@ -341,12 +366,19 @@ def main():
         )
         sys.exit(1)
 
-    # 3. 인덱스 구축 및 저장
+    # 3. 기존 벡터와 병합 후 인덱스 구축 및 저장
+    if existing_vectors is not None and existing_vectors.shape[0] > 0:
+        vectors = np.vstack([existing_vectors, new_vectors]).astype(np.float32)
+        all_metadatas = existing_metadatas + all_chunks
+    else:
+        vectors = new_vectors
+        all_metadatas = all_chunks
+
     store = VectorStore(dim=args.dim)
-    store.build(vectors, all_chunks)
+    store.build(vectors, all_metadatas)
     store.save(out_dir)
-    
-    logger.info(f"인덱스 구축 완료: {out_dir}")
+
+    logger.info(f"인덱스 구축 완료: {out_dir} (총 {len(all_metadatas)}개 청크)")
 
 
 if __name__ == "__main__":
